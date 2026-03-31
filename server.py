@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from analyze_message import analyze_message, get_spam_detector
+from analyze_message import analyze_message
 import os
 from dotenv import load_dotenv
 import uvicorn
@@ -13,12 +13,6 @@ app = FastAPI(
     description="A server to analyze messages for spam and phishing risks using ML and psychological factors.",
     version="1.0.0"
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    # Load the Hugging Face model and tokenizer after the server binds to the port.
-    get_spam_detector()
 
 
 class AnalysisRequest(BaseModel):
