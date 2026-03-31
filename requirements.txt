@@ -1,0 +1,9 @@
+torch
+transformers
+datasets
+pandas
+scikit-learn
+python-dotenv
+requests
+motor
+dnspython
