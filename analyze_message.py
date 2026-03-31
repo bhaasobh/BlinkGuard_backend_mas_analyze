@@ -34,11 +34,18 @@ HIGH_SIGNAL_FACTORS = {
     "scarcity",
 }
 
-spam_detector = pipeline(
-    "text-classification",
-    model=MODEL_REPO,
-    tokenizer=MODEL_REPO,
-)
+spam_detector = None
+
+
+def get_spam_detector():
+    global spam_detector
+    if spam_detector is None:
+        spam_detector = pipeline(
+            "text-classification",
+            model=MODEL_REPO,
+            tokenizer=MODEL_REPO,
+        )
+    return spam_detector
 
 
 def ml_risk_score(ml_result):
@@ -115,7 +122,7 @@ def final_decision(score):
 
 
 def analyze_message(message: str):
-    ml_result = spam_detector(message)[0]
+    ml_result = get_spam_detector()(message)[0]
     ml_prediction = "spam" if ml_result["label"] == "LABEL_1" else "not spam"
     ml_confidence = round(ml_result["score"], 2)
 
