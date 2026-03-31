@@ -1,7 +1,5 @@
-from pathlib import Path
 from pprint import pprint
 
-import requests
 from psychology_rules import psychology_risk_scores
 from transformers import pipeline
 
@@ -9,29 +7,7 @@ LOW_RISK_THRESHOLD = 0.0
 HIGH_RISK_THRESHOLD = 0.6
 ACTIVE_FACTOR_THRESHOLD = 0.25
 
-MODEL_DIR = Path("spam_model")
-MODEL_FILE = MODEL_DIR / "model.safetensors"
-MODEL_WEIGHTS_URL = "https://huggingface.co/bahaasobeh/blinkguard/resolve/main/model.safetensors"
-
-
-def ensure_model_weights():
-    if MODEL_FILE.exists():
-        return
-
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Downloading model weights from {MODEL_WEIGHTS_URL}...")
-    response = requests.get(MODEL_WEIGHTS_URL, stream=True)
-    response.raise_for_status()
-
-    with open(MODEL_FILE, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                f.write(chunk)
-
-    print(f"Saved model weights to {MODEL_FILE}")
-
-
-ensure_model_weights()
+MODEL_REPO = "bahaasobeh/blinkguard"
 
 PSYCHOLOGY_WEIGHTS = {
     "urgency": 1.1,
@@ -60,8 +36,8 @@ HIGH_SIGNAL_FACTORS = {
 
 spam_detector = pipeline(
     "text-classification",
-    model=str(MODEL_DIR),
-    tokenizer=str(MODEL_DIR),
+    model=MODEL_REPO,
+    tokenizer=MODEL_REPO,
 )
 
 
