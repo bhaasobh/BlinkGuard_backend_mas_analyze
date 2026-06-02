@@ -11,7 +11,12 @@ A proof-of-concept FastAPI server that analyzes messages for spam and phishing r
 
 ## Repository Structure
 
-- `server.py` - FastAPI application exposing `/analyze` and `/report`
+- `server.py` - Server entry point
+- `app/main.py` - FastAPI application setup
+- `app/routes/` - API route registration
+- `app/controllers/` - Request handler logic
+- `app/middleware/` - Authentication dependencies
+- `app/models/` - Pydantic request and response models
 - `analyze_message.py` - Core analysis logic combining ML and psychological risk scoring
 - `psychology_rules.py` - Rules for detecting psychological phishing signals
 - `mongodb_handler.py` - Saves phishing reports to MongoDB
@@ -34,6 +39,7 @@ Create a `.env` file in the project root with at least the following values:
 ```env
 MONGO_URI=mongodb+srv://<user>:<password>@<cluster>/<dbname>
 PORT=3000
+INTERNAL_API_KEY=<long-random-secret>
 ```
 
 ## Run the Server
@@ -71,6 +77,7 @@ Example curl:
 ```bash
 curl -X POST http://localhost:3000/analyze \
   -H "Content-Type: application/json" \
+  -H "X-Internal-Api-Key: <long-random-secret>" \
   -d '{"message":"URGENT: Verify your account now"}'
 ```
 

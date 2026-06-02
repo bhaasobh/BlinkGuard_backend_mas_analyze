@@ -3,11 +3,17 @@ from pprint import pprint
 from psychology_rules import psychology_risk_scores
 from transformers import pipeline
 
-LOW_RISK_THRESHOLD = 0.0
+LOW_RISK_THRESHOLD = 0.25
 HIGH_RISK_THRESHOLD = 0.6
 ACTIVE_FACTOR_THRESHOLD = 0.25
 
 MODEL_REPO = "bahaasobeh/blinkguard"
+
+MODEL_LABELS = {
+    "label_0": "safe",
+    "label_1": "spam",
+    "label_2": "phishing",
+}
 
 PSYCHOLOGY_WEIGHTS = {
     "urgency": 1.1,
@@ -48,10 +54,58 @@ def get_spam_detector():
     return spam_detector
 
 
+def _normalize_confidence(confidence):
+    if isinstance(confidence, str):
+        confidence = confidence.strip().rstrip("%")
+
+    confidence = float(confidence)
+    if confidence > 1:
+        confidence = confidence / 100
+
+    return max(0.0, min(confidence, 1.0))
+
+
+def normalize_ml_result(ml_result):
+    class_name = (
+        ml_result.get("Class")
+        or ml_result.get("class")
+        or ml_result.get("label")
+        or ""
+    )
+    confidence = (
+        ml_result.get("Confidence")
+        or ml_result.get("confidence")
+        or ml_result.get("score")
+        or 0.0
+    )
+
+    normalized_class = str(class_name).strip().lower()
+    confidence = _normalize_confidence(confidence)
+
+    normalized_class = MODEL_LABELS.get(normalized_class, normalized_class)
+
+    if normalized_class in {"not spam", "ham"}:
+        normalized_class = "safe"
+
+    return {
+        "class": normalized_class,
+        "confidence": confidence,
+        "raw": ml_result,
+    }
+
+
 def ml_risk_score(ml_result):
-    if ml_result["label"] == "LABEL_1":
-        return ml_result["score"]
-    return 1 - ml_result["score"]
+    ml_class = ml_result["class"]
+    confidence = ml_result["confidence"]
+
+    if ml_class == "phishing":
+        return confidence
+    if ml_class == "spam":
+        return confidence
+    if ml_class == "safe":
+        return 1 - confidence
+
+    return 0.5
 
 
 def psychology_weighted_score(psychology_scores):
@@ -81,6 +135,9 @@ def combined_risk_score(ml_result, psychology_scores):
 
     final_score = (0.55 * ml_risk) + (0.45 * psychology_score)
 
+    if ml_result["class"] == "phishing":
+        final_score = max(final_score, ml_risk)
+
     if ml_risk < 0.2 and signal_count >= 3:
         final_score += 0.2
 
@@ -108,23 +165,35 @@ def combined_risk_score(ml_result, psychology_scores):
 def risk_band(score):
     if score >= HIGH_RISK_THRESHOLD:
         return "high"
-    if score > LOW_RISK_THRESHOLD:
+    if score >= LOW_RISK_THRESHOLD:
         return "medium"
     return "low"
 
 
-def final_decision(score):
+def final_decision(score, ml_result):
+    ml_class = ml_result["class"]
+    confidence = ml_result["confidence"]
+
+    if ml_class == "phishing":
+        if confidence >= HIGH_RISK_THRESHOLD:
+            return "phishing"
+        return "suspicious"
+
+    if ml_class == "spam":
+        return "suspicious"
+
     if score >= HIGH_RISK_THRESHOLD:
         return "phishing"
-    if score > LOW_RISK_THRESHOLD:
+    if score >= LOW_RISK_THRESHOLD:
         return "suspicious"
     return "not phishing"
 
 
 def analyze_message(message: str):
-    ml_result = get_spam_detector()(message)[0]
-    ml_prediction = "spam" if ml_result["label"] == "LABEL_1" else "not spam"
-    ml_confidence = round(ml_result["score"], 2)
+    raw_ml_result = get_spam_detector()(message)[0]
+    ml_result = normalize_ml_result(raw_ml_result)
+    ml_prediction = ml_result["class"]
+    ml_confidence = round(ml_result["confidence"], 2)
 
     psychology_scores = psychology_risk_scores(message)
     psychology_score = psychology_weighted_score(psychology_scores)
@@ -139,7 +208,7 @@ def analyze_message(message: str):
         "ml_prediction": ml_prediction,
         "ml_confidence": ml_confidence,
         "ml_risk_score": round(ml_risk_score(ml_result), 2),
-        "final_decision": final_decision(final_risk),
+        "final_decision": final_decision(final_risk, ml_result),
         "risk_band": risk_band(final_risk),
         "final_risk_score": final_risk,
         "psychology_average": psychology_score,
