@@ -49,7 +49,6 @@ def get_spam_detector():
         spam_detector = pipeline(
             "text-classification",
             model=MODEL_REPO,
-            tokenizer=MODEL_REPO,
         )
     return spam_detector
 
